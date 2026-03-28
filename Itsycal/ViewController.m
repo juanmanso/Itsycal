@@ -139,6 +139,26 @@ static NSDate *MoMenubarCountdownRelevantDateForEvent(EKEvent *event, NSDate *no
     return event.endDate;
 }
 
+static NSString *MoMenubarCountdownString(NSString *title, NSString *timeStr, BOOL untilStart, BOOL untilEnd, BOOL nowLabel)
+{
+    if (title.length == 0) {
+        if (nowLabel) return NSLocalizedString(@"now", @"Menubar event countdown while an untitled event has just started");
+        if (untilEnd) return timeStr ?: @"";
+        NSString *countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ in %2$@", @"Menubar countdown before event: event title, then time until start"), @"", timeStr ?: @""];
+        return [countdown stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    }
+    if (nowLabel) {
+        return [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ – now", @"Menubar event countdown while the event just started"), title];
+    }
+    if (untilStart) {
+        return [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ in %2$@", @"Menubar countdown before event: event title, then time until start"), title, timeStr ?: @""];
+    }
+    if (untilEnd) {
+        return [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ – %2$@", @"Menubar countdown during event: event title, then time until end"), title, timeStr ?: @""];
+    }
+    return @"";
+}
+
 @implementation ViewController
 {
     EventCenter   *_ec;
@@ -1574,7 +1594,8 @@ static NSDate *MoMenubarCountdownRelevantDateForEvent(EKEvent *event, NSDate *no
     }
 
     if (nextEvent) {
-        NSString *title = MoMenubarSingleLineTitle(nextEvent.event.title);
+        NSString *title = MoMenubarSingleLineTitle(nextEvent.event.title ?: @"");
+        title = [title stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         NSTimeInterval delta = 0;
         BOOL buildingUntilStart = NO;
         BOOL buildingUntilEnd = NO;
@@ -1610,14 +1631,7 @@ static NSDate *MoMenubarCountdownRelevantDateForEvent(EKEvent *event, NSDate *no
         }
 
         title = [self mo_eventTitleByTruncatingForMenubarCountdown:title timeStr:timeStr untilStart:buildingUntilStart nowLabel:buildingNowLabel];
-
-        if (buildingNowLabel) {
-            countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ – now", @"Menubar event countdown while the event just started"), title];
-        } else if (buildingUntilStart) {
-            countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ in %2$@", @"Menubar countdown before event: event title, then time until start"), title, timeStr];
-        } else if (buildingUntilEnd) {
-            countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ – %2$@", @"Menubar countdown during event: event title, then time until end"), title, timeStr];
-        }
+        countdown = MoMenubarCountdownString(title, timeStr, buildingUntilStart, buildingUntilEnd, buildingNowLabel);
     }
 
     BOOL unchanged = (_eventCountdownString == countdown) || [_eventCountdownString isEqualToString:countdown];
