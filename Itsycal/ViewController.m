@@ -1538,6 +1538,10 @@ static NSString *MoStringByTruncatingMiddleToWidth(NSString *string, CGFloat max
     // Check today and tomorrow to catch events within the 8-hour window across midnight.
     MoDate today = [self todayDate];
     MoDate tomorrow = AddDaysToDate(1, today);
+    MoDate countdownFetchEnd = AddDaysToDate(2, today);
+    if (![_ec hasFetchedEventsWithStartDate:today endDate:countdownFetchEnd]) {
+        [_ec fetchEventsWithStartDate:today endDate:countdownFetchEnd];
+    }
     NSMutableArray *candidates = [NSMutableArray new];
     NSArray *todayEvents = [self eventsForDate:today];
     NSArray *tomorrowEvents = [self eventsForDate:tomorrow];
@@ -1873,4 +1877,3 @@ static NSString *MoStringByTruncatingMiddleToWidth(NSString *string, CGFloat max
 }
 
 @end
-

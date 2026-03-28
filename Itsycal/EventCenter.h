@@ -36,6 +36,8 @@
 - (BOOL)removeEvent:(EKEvent *)event span:(EKSpan)span error:(NSError **)error;
 
 - (void)fetchEvents;
+- (void)fetchEventsWithStartDate:(MoDate)startMoDate endDate:(MoDate)endMoDate;
+- (BOOL)hasFetchedEventsWithStartDate:(MoDate)startMoDate endDate:(MoDate)endMoDate;
 
 // Sorted array of 2 types: NSStrings and CalendarInfo objects.
 // The NSStrings are the names of calendar sources.
