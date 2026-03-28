@@ -88,6 +88,49 @@ static NSString *MoStringByTruncatingTailToWidth(NSString *string, CGFloat maxWi
     return [[string substringToIndex:len] stringByAppendingString:ellipsis];
 }
 
+/** Middle truncation: prefix + ellipsis + suffix, maximizing composed characters kept. */
+static NSString *MoStringByTruncatingMiddleToWidth(NSString *string, CGFloat maxWidth, NSFont *font, NSParagraphStyle *para)
+{
+    if (string.length == 0 || maxWidth <= 0) return string;
+    NSDictionary *attrs = @{NSFontAttributeName: font, NSParagraphStyleAttributeName: para};
+    NSAttributedString *full = [[NSAttributedString alloc] initWithString:string attributes:attrs];
+    if (MoAttributedStringWidth(full) <= maxWidth) return string;
+    static NSString *ellipsis;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ ellipsis = @"\u2026"; });
+    NSAttributedString *asEll = [[NSAttributedString alloc] initWithString:ellipsis attributes:attrs];
+    CGFloat ellW = MoAttributedStringWidth(asEll);
+    if (maxWidth <= ellW) return ellipsis;
+    NSMutableArray<NSValue *> *ranges = [NSMutableArray array];
+    [string enumerateSubstringsInRange:NSMakeRange(0, string.length) options:NSStringEnumerationByComposedCharacterSequences usingBlock:^(NSString *substring, NSRange substringRange, NSRange enclosingRange, BOOL *stop) {
+        [ranges addObject:[NSValue valueWithRange:substringRange]];
+    }];
+    NSUInteger n = ranges.count;
+    if (n == 0) return ellipsis;
+    NSInteger bestL = 0, bestR = 0, bestSum = -1;
+    for (NSUInteger L = 0; L <= n; L++) {
+        for (NSUInteger R = 0; R <= n - L; R++) {
+            if (L == 0 && R == 0) continue;
+            NSString *leftStr = L > 0 ? [string substringWithRange:NSMakeRange(0, NSMaxRange([ranges[L - 1] rangeValue]))] : @"";
+            NSString *rightStr = R > 0 ? [string substringFromIndex:[ranges[n - R] rangeValue].location] : @"";
+            NSString *candidate = [[leftStr stringByAppendingString:ellipsis] stringByAppendingString:rightStr];
+            NSAttributedString *asCand = [[NSAttributedString alloc] initWithString:candidate attributes:attrs];
+            if (MoAttributedStringWidth(asCand) <= maxWidth) {
+                NSInteger sum = (NSInteger)(L + R);
+                if (sum > bestSum) {
+                    bestSum = sum;
+                    bestL = L;
+                    bestR = R;
+                }
+            }
+        }
+    }
+    if (bestSum < 0) return ellipsis;
+    NSString *leftStr = bestL > 0 ? [string substringWithRange:NSMakeRange(0, NSMaxRange([ranges[bestL - 1] rangeValue]))] : @"";
+    NSString *rightStr = bestR > 0 ? [string substringFromIndex:[ranges[n - (NSUInteger)bestR] rangeValue].location] : @"";
+    return [[leftStr stringByAppendingString:ellipsis] stringByAppendingString:rightStr];
+}
+
 @implementation ViewController
 {
     EventCenter   *_ec;
@@ -134,6 +177,7 @@ static NSString *MoStringByTruncatingTailToWidth(NSString *string, CGFloat maxWi
     [[NSUserDefaults standardUserDefaults] removeObserver:self forKeyPath:kBaselineOffset];
     [[NSUserDefaults standardUserDefaults] removeObserver:self forKeyPath:kClockFormat];
     [[NSUserDefaults standardUserDefaults] removeObserver:self forKeyPath:kMenubarCountdownMaxWidthIconUnits];
+    [[NSUserDefaults standardUserDefaults] removeObserver:self forKeyPath:kMenubarCountdownTruncateTitleMiddle];
 }
 
 #pragma mark -
@@ -1471,7 +1515,11 @@ static NSString *MoStringByTruncatingTailToWidth(NSString *string, CGFloat maxWi
     CGFloat maxTitleW = maxTotal - reserved;
     maxTitleW = MAX(24.0, maxTitleW);
     NSFont *font = [NSFont systemFontOfSize:0 weight:NSFontWeightRegular];
-    return MoStringByTruncatingTailToWidth(title, maxTitleW, font, MoMenubarSingleLineParagraphStyle());
+    NSParagraphStyle *para = MoMenubarSingleLineParagraphStyle();
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:kMenubarCountdownTruncateTitleMiddle]) {
+        return MoStringByTruncatingMiddleToWidth(title, maxTitleW, font, para);
+    }
+    return MoStringByTruncatingTailToWidth(title, maxTitleW, font, para);
 }
 
 - (void)updateEventCountdownIfNecessary
@@ -1791,7 +1839,7 @@ static NSString *MoStringByTruncatingTailToWidth(NSString *string, CGFloat maxWi
     [_notificationTokens addObject:token];
 
     // Observe NSUserDefaults for preference changes
-    for (NSString *keyPath in @[kShowEventDays, kMenuBarIconType, kShowMonthInIcon, kShowDayOfWeekInIcon, kShowDaysWithNoEventsInAgenda, kShowMeetingIndicator, kShowEventCountdown, kMenubarCountdownMaxWidthIconUnits, kHideIcon, kBaselineOffset, kClockFormat]) {
+    for (NSString *keyPath in @[kShowEventDays, kMenuBarIconType, kShowMonthInIcon, kShowDayOfWeekInIcon, kShowDaysWithNoEventsInAgenda, kShowMeetingIndicator, kShowEventCountdown, kMenubarCountdownMaxWidthIconUnits, kMenubarCountdownTruncateTitleMiddle, kHideIcon, kBaselineOffset, kClockFormat]) {
         [[NSUserDefaults standardUserDefaults] addObserver:self forKeyPath:keyPath options:NSKeyValueObservingOptionNew context:NULL];
     }
 }
@@ -1806,7 +1854,8 @@ static NSString *MoStringByTruncatingTailToWidth(NSString *string, CGFloat maxWi
         [self updateAgenda];
     }
     else if ([keyPath isEqualToString:kShowEventCountdown] ||
-             [keyPath isEqualToString:kMenubarCountdownMaxWidthIconUnits]) {
+             [keyPath isEqualToString:kMenubarCountdownMaxWidthIconUnits] ||
+             [keyPath isEqualToString:kMenubarCountdownTruncateTitleMiddle]) {
         [self updateEventCountdownIfNecessary];
     }
     else if ([keyPath isEqualToString:kMenuBarIconType] ||

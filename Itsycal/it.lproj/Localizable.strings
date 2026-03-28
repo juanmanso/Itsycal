@@ -115,6 +115,8 @@ Si prega di esci da Itsycal, spostarlo nella cartella Applicazioni, e riavvia.";
 "Show event dots" = "Mostra punti per gli eventi";
 "Show event location" = "Mostra la posizione dell'evento";
 "Show event countdown" = "Mostra il conto alla rovescia dell’evento";
+"Countdown menubar width (× status bar height)" = "Larghezza conto alla rovescia (× altezza barra menu)";
+"Truncate long titles in the middle" = "Tronca titoli lunghi al centro";
 "%1$@ – %2$@" = "%1$@ – %2$@";
 "%1$@ – now" = "%1$@ – ora";
 "%1$@ in %2$@" = "%1$@ tra %2$@";

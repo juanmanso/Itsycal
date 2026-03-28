@@ -44,7 +44,8 @@
         kShowLocation:         @(NO),
         kEnableTahoeMenuIcons: @(NO),
         kDoNotDrawOutlineAroundCurrentMonth: @(NO),
-        kMenubarCountdownMaxWidthIconUnits: @(5)
+        kMenubarCountdownMaxWidthIconUnits: @(5),
+        kMenubarCountdownTruncateTitleMiddle: @(NO)
     }];
     
     // Constrain kShowEventDays to values 0...9 in (unlikely) case it is invalid.

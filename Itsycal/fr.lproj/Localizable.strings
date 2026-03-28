@@ -115,6 +115,8 @@ S'il vous plaît quitter Itsycal, le déplacer dans le dossier Applications, et 
 "Show event dots" = "Afficher les indicateurs d'évènements";
 "Show event location" = "Afficher l'emplacement de l'événement";
 "Show event countdown" = "Afficher le compte à rebours de l’événement";
+"Countdown menubar width (× status bar height)" = "Largeur du compte à rebours (× hauteur de la barre)";
+"Truncate long titles in the middle" = "Tronquer les titres longs au milieu";
 "%1$@ – %2$@" = "%1$@ – %2$@";
 "%1$@ – now" = "%1$@ – maintenant";
 "%1$@ in %2$@" = "%1$@ dans %2$@";
