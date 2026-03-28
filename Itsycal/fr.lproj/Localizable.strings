@@ -114,6 +114,12 @@ S'il vous plaît quitter Itsycal, le déplacer dans le dossier Applications, et 
 "Show days with no events" = "Afficher les jours sans événements";
 "Show event dots" = "Afficher les indicateurs d'évènements";
 "Show event location" = "Afficher l'emplacement de l'événement";
+"Show event countdown" = "Afficher le compte à rebours de l’événement";
+"%1$@ – %2$@" = "%1$@ – %2$@";
+"%1$@ – now" = "%1$@ – maintenant";
+"%1$@ in %2$@" = "%1$@ dans %2$@";
+"%1$ldh %2$ldm" = "%1$ld h %2$ld min";
+"%1$ldm" = "%1$ld min";
 "Show month in icon" = "L'icône affiche le mois";
 "Starts:" = "Commence :";
 "Sunday" = "dimanche";

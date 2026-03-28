@@ -1379,26 +1379,30 @@
 
     // TODO(post-review): Optional truncation/ellipsis for very long event titles in the menubar countdown.
     if (nextEvent) {
-        NSTimeInterval delta;
-        NSString *prefix;
+        NSTimeInterval delta = 0;
+        BOOL buildingUntilStart = NO;
+        BOOL buildingUntilEnd = NO;
+        BOOL buildingNowLabel = NO;
         if ([now compare:nextEvent.event.startDate] == NSOrderedAscending) {
             // Event hasn't started yet: show time until start.
             delta = [nextEvent.event.startDate timeIntervalSinceDate:now];
-            prefix = @"in";
+            buildingUntilStart = YES;
         } else {
             // Event is in progress: show "now" for the first few minutes.
             NSTimeInterval elapsed = [now timeIntervalSinceDate:nextEvent.event.startDate];
             NSTimeInterval duration = [nextEvent.event.endDate timeIntervalSinceDate:nextEvent.event.startDate];
             NSTimeInterval nowThreshold = (duration > 15 * 60) ? 10 * 60 : 5 * 60;
             if (elapsed < nowThreshold) {
-                countdown = [NSString stringWithFormat:@"%@ - now", nextEvent.event.title];
+                buildingNowLabel = YES;
             } else {
                 delta = [nextEvent.event.endDate timeIntervalSinceDate:now];
-                prefix = @"-";
+                buildingUntilEnd = YES;
             }
         }
 
-        if (countdown == nil) {
+        if (buildingNowLabel) {
+            countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ – now", @"Menubar event countdown while the event just started"), nextEvent.event.title];
+        } else if (buildingUntilStart || buildingUntilEnd) {
             NSInteger hours = (NSInteger)(delta / 3600);
             NSInteger minutes = (NSInteger)(fmod(delta, 3600) / 60);
             // Round up so "59s left" shows as "1m" not "0m".
@@ -1406,12 +1410,16 @@
 
             NSString *timeStr;
             if (hours > 0) {
-                timeStr = [NSString stringWithFormat:@"%ldh %ldm", (long)hours, (long)minutes];
+                timeStr = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$ldh %2$ldm", @"Menubar countdown duration: hours and minutes"), (long)hours, (long)minutes];
             } else {
-                timeStr = [NSString stringWithFormat:@"%ldm", (long)minutes];
+                timeStr = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$ldm", @"Menubar countdown duration: minutes only"), (long)minutes];
             }
 
-            countdown = [NSString stringWithFormat:@"%@ %@ %@", nextEvent.event.title, prefix, timeStr];
+            if (buildingUntilStart) {
+                countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ in %2$@", @"Menubar countdown before event: event title, then time until start"), nextEvent.event.title, timeStr];
+            } else {
+                countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ – %2$@", @"Menubar countdown during event: event title, then time until end"), nextEvent.event.title, timeStr];
+            }
         }
     }
 
