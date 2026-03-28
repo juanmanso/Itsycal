@@ -23,6 +23,29 @@
 #import "MoUtils.h"
 #import "Sparkle/SUUpdater.h"
 
+/** Calendar titles may contain newlines; menubar status text must stay one line. */
+static NSString *MoMenubarSingleLineTitle(NSString *title)
+{
+    if (title.length == 0) return title;
+    NSMutableString *s = [title mutableCopy];
+    [s replaceOccurrencesOfString:@"\r\n" withString:@" " options:0 range:NSMakeRange(0, s.length)];
+    [s replaceOccurrencesOfString:@"\n" withString:@" " options:0 range:NSMakeRange(0, s.length)];
+    [s replaceOccurrencesOfString:@"\r" withString:@" " options:0 range:NSMakeRange(0, s.length)];
+    return [s copy];
+}
+
+static NSParagraphStyle *MoMenubarSingleLineParagraphStyle(void)
+{
+    static NSParagraphStyle *style;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSMutableParagraphStyle *p = [NSMutableParagraphStyle new];
+        p.lineBreakMode = NSLineBreakByTruncatingTail;
+        style = [p copy];
+    });
+    return style;
+}
+
 @implementation ViewController
 {
     EventCenter   *_ec;
@@ -682,12 +705,15 @@
     attachment.bounds = NSMakeRect(0, -1.5, barWidth, barHeight);
 
     NSFont *regularFont = [NSFont systemFontOfSize:0 weight:NSFontWeightRegular];
+    NSParagraphStyle *para = MoMenubarSingleLineParagraphStyle();
+    NSDictionary *textAttrs = @{NSFontAttributeName: regularFont, NSBaselineOffsetAttributeName: @(baselineOffset), NSParagraphStyleAttributeName: para};
+    NSDictionary *prefixAttrs = @{NSBaselineOffsetAttributeName: @(baselineOffset), NSParagraphStyleAttributeName: para};
     NSMutableAttributedString *result = [NSMutableAttributedString new];
     if (prefix.length > 0) {
-        [result appendAttributedString:[[NSAttributedString alloc] initWithString:prefix attributes:@{NSBaselineOffsetAttributeName: @(baselineOffset)}]];
+        [result appendAttributedString:[[NSAttributedString alloc] initWithString:prefix attributes:prefixAttrs]];
     }
     [result appendAttributedString:[NSAttributedString attributedStringWithAttachment:attachment]];
-    [result appendAttributedString:[[NSAttributedString alloc] initWithString:[@" " stringByAppendingString:_eventCountdownString] attributes:@{NSFontAttributeName: regularFont, NSBaselineOffsetAttributeName: @(baselineOffset)}]];
+    [result appendAttributedString:[[NSAttributedString alloc] initWithString:[@" " stringByAppendingString:_eventCountdownString] attributes:textAttrs]];
     return result;
 }
 
@@ -743,12 +769,14 @@
             // Prepend a space to _clockFormat text to separate it from icon.
             buttonText = [@" " stringByAppendingString:buttonText];
         }
+        NSParagraphStyle *para = MoMenubarSingleLineParagraphStyle();
+        NSDictionary *clockAttrs = @{NSBaselineOffsetAttributeName: @(baselineOffset), NSParagraphStyleAttributeName: para};
         if (_eventCountdownString) {
-            NSMutableAttributedString *combined = [[NSMutableAttributedString alloc] initWithString:buttonText attributes:@{NSBaselineOffsetAttributeName: @(baselineOffset)}];
+            NSMutableAttributedString *combined = [[NSMutableAttributedString alloc] initWithString:buttonText attributes:clockAttrs];
             [combined appendAttributedString:[self countdownAttributedStringWithBaselineOffset:baselineOffset prefix:@"  "]];
             _statusItem.button.attributedTitle = combined;
         } else {
-            _statusItem.button.attributedTitle = [[NSAttributedString alloc] initWithString:buttonText attributes:@{NSBaselineOffsetAttributeName: @(baselineOffset)}];
+            _statusItem.button.attributedTitle = [[NSAttributedString alloc] initWithString:buttonText attributes:clockAttrs];
         }
     }
     else if (_eventCountdownString) {
@@ -1377,8 +1405,9 @@
         }
     }
 
-    // TODO(post-review): Optional truncation/ellipsis for very long event titles in the menubar countdown.
+    // TODO(post-review): Optional max length / tighter truncation for very long titles (paragraph style already truncates visually when width is tight).
     if (nextEvent) {
+        NSString *title = MoMenubarSingleLineTitle(nextEvent.event.title);
         NSTimeInterval delta = 0;
         BOOL buildingUntilStart = NO;
         BOOL buildingUntilEnd = NO;
@@ -1401,7 +1430,7 @@
         }
 
         if (buildingNowLabel) {
-            countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ – now", @"Menubar event countdown while the event just started"), nextEvent.event.title];
+            countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ – now", @"Menubar event countdown while the event just started"), title];
         } else if (buildingUntilStart || buildingUntilEnd) {
             NSInteger hours = (NSInteger)(delta / 3600);
             NSInteger minutes = (NSInteger)(fmod(delta, 3600) / 60);
@@ -1416,9 +1445,9 @@
             }
 
             if (buildingUntilStart) {
-                countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ in %2$@", @"Menubar countdown before event: event title, then time until start"), nextEvent.event.title, timeStr];
+                countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ in %2$@", @"Menubar countdown before event: event title, then time until start"), title, timeStr];
             } else {
-                countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ – %2$@", @"Menubar countdown during event: event title, then time until end"), nextEvent.event.title, timeStr];
+                countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ – %2$@", @"Menubar countdown during event: event title, then time until end"), title, timeStr];
             }
         }
     }
