@@ -1407,7 +1407,8 @@
         }
     }
 
-    if (![_eventCountdownString isEqualToString:countdown] && (countdown != _eventCountdownString)) {
+    BOOL unchanged = (_eventCountdownString == countdown) || [_eventCountdownString isEqualToString:countdown];
+    if (!unchanged) {
         _eventCountdownString = countdown;
         [self updateMenubarIcon];
     }
