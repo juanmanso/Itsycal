@@ -35,6 +35,8 @@ extern NSString * const kShowDaysWithNoEventsInAgenda;
 extern NSString * const kShowEventPopoverOnHover;
 extern NSString * const kEnableTahoeMenuIcons;
 extern NSString * const kShowEventCountdown;
+/// Multiplier × system status bar thickness (≈ one menubar “icon slot”) for max Itsycal status item width when showing countdown. Default 5; change via defaults or registerDefaults.
+extern NSString * const kMenubarCountdownMaxWidthIconUnits;
 
 // Set an associated object on NSDate to indicate
 // whether of not this date has events.

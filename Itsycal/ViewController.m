@@ -46,6 +46,48 @@ static NSParagraphStyle *MoMenubarSingleLineParagraphStyle(void)
     return style;
 }
 
+static CGFloat MoAttributedStringWidth(NSAttributedString *as)
+{
+    if (as.length == 0) return 0;
+    NSRect r = [as boundingRectWithSize:NSMakeSize(CGFLOAT_MAX, 80) options:NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading];
+    return (CGFloat)ceil(NSWidth(r));
+}
+
+/** Tail truncation with ellipsis at composed-character boundaries. */
+static NSString *MoStringByTruncatingTailToWidth(NSString *string, CGFloat maxWidth, NSFont *font, NSParagraphStyle *para)
+{
+    if (string.length == 0 || maxWidth <= 0) return string;
+    NSDictionary *attrs = @{NSFontAttributeName: font, NSParagraphStyleAttributeName: para};
+    NSAttributedString *full = [[NSAttributedString alloc] initWithString:string attributes:attrs];
+    if (MoAttributedStringWidth(full) <= maxWidth) return string;
+    static NSString *ellipsis;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ ellipsis = @"\u2026"; });
+    NSAttributedString *asEll = [[NSAttributedString alloc] initWithString:ellipsis attributes:attrs];
+    CGFloat ellW = MoAttributedStringWidth(asEll);
+    if (maxWidth <= ellW) return ellipsis;
+    NSMutableArray<NSNumber *> *endIndices = [NSMutableArray array];
+    [string enumerateSubstringsInRange:NSMakeRange(0, string.length) options:NSStringEnumerationByComposedCharacterSequences usingBlock:^(NSString *substring, NSRange substringRange, NSRange enclosingRange, BOOL *stop) {
+        [endIndices addObject:@(NSMaxRange(substringRange))];
+    }];
+    NSInteger lo = 0, hi = (NSInteger)endIndices.count - 1, best = -1;
+    while (lo <= hi) {
+        NSInteger mid = (lo + hi) / 2;
+        NSUInteger prefixLen = endIndices[mid].unsignedIntegerValue;
+        NSString *candidate = [[string substringToIndex:prefixLen] stringByAppendingString:ellipsis];
+        NSAttributedString *asCand = [[NSAttributedString alloc] initWithString:candidate attributes:attrs];
+        if (MoAttributedStringWidth(asCand) <= maxWidth) {
+            best = mid;
+            lo = mid + 1;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    if (best < 0) return ellipsis;
+    NSUInteger len = endIndices[best].unsignedIntegerValue;
+    return [[string substringToIndex:len] stringByAppendingString:ellipsis];
+}
+
 @implementation ViewController
 {
     EventCenter   *_ec;
@@ -91,6 +133,7 @@ static NSParagraphStyle *MoMenubarSingleLineParagraphStyle(void)
     [[NSUserDefaults standardUserDefaults] removeObserver:self forKeyPath:kHideIcon];
     [[NSUserDefaults standardUserDefaults] removeObserver:self forKeyPath:kBaselineOffset];
     [[NSUserDefaults standardUserDefaults] removeObserver:self forKeyPath:kClockFormat];
+    [[NSUserDefaults standardUserDefaults] removeObserver:self forKeyPath:kMenubarCountdownMaxWidthIconUnits];
 }
 
 #pragma mark -
@@ -1363,8 +1406,72 @@ static NSParagraphStyle *MoMenubarSingleLineParagraphStyle(void)
     }
     if (_shouldShowMeetingIndicator != show) {
         _shouldShowMeetingIndicator = show;
+        [self updateEventCountdownIfNecessary];
         [self updateMenubarIcon];
     }
+}
+
+- (CGFloat)mo_maxMenubarCountdownItemWidthPoints
+{
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    double raw = [defaults objectForKey:kMenubarCountdownMaxWidthIconUnits] ? [defaults doubleForKey:kMenubarCountdownMaxWidthIconUnits] : 5.0;
+    CGFloat units = (CGFloat)MAX(1.0, MIN(raw, 30.0));
+    CGFloat thickness = NSStatusBar.systemStatusBar.thickness;
+    if (thickness < 1.0) thickness = 22.0;
+    return thickness * units;
+}
+
+- (CGFloat)mo_measureMenubarTextWidth:(NSString *)string font:(NSFont *)font paragraphStyle:(NSParagraphStyle *)para
+{
+    if (string.length == 0) return 0;
+    NSDictionary *attrs = @{NSFontAttributeName: font, NSParagraphStyleAttributeName: para};
+    return MoAttributedStringWidth([[NSAttributedString alloc] initWithString:string attributes:attrs]);
+}
+
+/// Width of clock, meet badge, bar attachment, spaces, and localized suffix (without the event title text).
+- (CGFloat)mo_reservedMenubarWidthExcludingEventTitleWithTimeStr:(NSString *)timeStr untilStart:(BOOL)untilStart nowLabel:(BOOL)nowLabel
+{
+    NSParagraphStyle *para = MoMenubarSingleLineParagraphStyle();
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    BOOL hideIcon = [defaults boolForKey:kHideIcon];
+    BOOL showMeet = [defaults boolForKey:kShowMeetingIndicator] && _shouldShowMeetingIndicator;
+    CGFloat w = 12; // slack for layout / measurement variance
+    if (hideIcon && showMeet) {
+        NSImage *img = [NSImage imageNamed:@"meetSolid"];
+        CGFloat iw = img ? (CGFloat)ceil(img.size.width) : 18;
+        w += MAX(iw, 16) + 6;
+    }
+    NSFont *buttonFont = _statusItem.button.font ?: [NSFont systemFontOfSize:13];
+    NSFont *countdownFont = [NSFont systemFontOfSize:0 weight:NSFontWeightRegular];
+    if (_clockFormat) {
+        [_iconDateFormatter setDateFormat:_clockFormat];
+        NSString *clockStr = [_iconDateFormatter stringFromDate:[NSDate date]];
+        if (!hideIcon) clockStr = [@" " stringByAppendingString:clockStr];
+        w += [self mo_measureMenubarTextWidth:clockStr font:buttonFont paragraphStyle:para];
+        w += [self mo_measureMenubarTextWidth:@"  " font:buttonFont paragraphStyle:para];
+    }
+    w += 3.5;
+    w += [self mo_measureMenubarTextWidth:@" " font:countdownFont paragraphStyle:para];
+    NSString *tailWithoutTitle;
+    if (nowLabel) {
+        tailWithoutTitle = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ – now", @"Menubar event countdown while the event just started"), @""];
+    } else if (untilStart) {
+        tailWithoutTitle = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ in %2$@", @"Menubar countdown before event: event title, then time until start"), @"", timeStr ?: @""];
+    } else {
+        tailWithoutTitle = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ – %2$@", @"Menubar countdown during event: event title, then time until end"), @"", timeStr ?: @""];
+    }
+    w += [self mo_measureMenubarTextWidth:tailWithoutTitle font:countdownFont paragraphStyle:para];
+    return w;
+}
+
+- (NSString *)mo_eventTitleByTruncatingForMenubarCountdown:(NSString *)title timeStr:(NSString *)timeStr untilStart:(BOOL)untilStart nowLabel:(BOOL)nowLabel
+{
+    CGFloat maxTotal = [self mo_maxMenubarCountdownItemWidthPoints];
+    CGFloat reserved = [self mo_reservedMenubarWidthExcludingEventTitleWithTimeStr:timeStr untilStart:untilStart nowLabel:nowLabel];
+    CGFloat maxTitleW = maxTotal - reserved;
+    maxTitleW = MAX(24.0, maxTitleW);
+    NSFont *font = [NSFont systemFontOfSize:0 weight:NSFontWeightRegular];
+    return MoStringByTruncatingTailToWidth(title, maxTitleW, font, MoMenubarSingleLineParagraphStyle());
 }
 
 - (void)updateEventCountdownIfNecessary
@@ -1405,7 +1512,6 @@ static NSParagraphStyle *MoMenubarSingleLineParagraphStyle(void)
         }
     }
 
-    // TODO(post-review): Optional max length / tighter truncation for very long titles (paragraph style already truncates visually when width is tight).
     if (nextEvent) {
         NSString *title = MoMenubarSingleLineTitle(nextEvent.event.title);
         NSTimeInterval delta = 0;
@@ -1429,26 +1535,27 @@ static NSParagraphStyle *MoMenubarSingleLineParagraphStyle(void)
             }
         }
 
-        if (buildingNowLabel) {
-            countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ – now", @"Menubar event countdown while the event just started"), title];
-        } else if (buildingUntilStart || buildingUntilEnd) {
+        NSString *timeStr = @"";
+        if (buildingUntilStart || buildingUntilEnd) {
             NSInteger hours = (NSInteger)(delta / 3600);
             NSInteger minutes = (NSInteger)(fmod(delta, 3600) / 60);
             // Round up so "59s left" shows as "1m" not "0m".
             if (minutes == 0 && delta > 0 && hours == 0) minutes = 1;
-
-            NSString *timeStr;
             if (hours > 0) {
                 timeStr = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$ldh %2$ldm", @"Menubar countdown duration: hours and minutes"), (long)hours, (long)minutes];
             } else {
                 timeStr = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$ldm", @"Menubar countdown duration: minutes only"), (long)minutes];
             }
+        }
 
-            if (buildingUntilStart) {
-                countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ in %2$@", @"Menubar countdown before event: event title, then time until start"), title, timeStr];
-            } else {
-                countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ – %2$@", @"Menubar countdown during event: event title, then time until end"), title, timeStr];
-            }
+        title = [self mo_eventTitleByTruncatingForMenubarCountdown:title timeStr:timeStr untilStart:buildingUntilStart nowLabel:buildingNowLabel];
+
+        if (buildingNowLabel) {
+            countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ – now", @"Menubar event countdown while the event just started"), title];
+        } else if (buildingUntilStart) {
+            countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ in %2$@", @"Menubar countdown before event: event title, then time until start"), title, timeStr];
+        } else if (buildingUntilEnd) {
+            countdown = [NSString localizedStringWithFormat:NSLocalizedString(@"%1$@ – %2$@", @"Menubar countdown during event: event title, then time until end"), title, timeStr];
         }
     }
 
@@ -1581,6 +1688,7 @@ static NSParagraphStyle *MoMenubarSingleLineParagraphStyle(void)
         _statusItem.button.title = @"";
     }
     [self updateStatusItemFont];
+    [self updateEventCountdownIfNecessary];
     [self updateMenubarIcon];
     [self updateTimer];
 }
@@ -1683,7 +1791,7 @@ static NSParagraphStyle *MoMenubarSingleLineParagraphStyle(void)
     [_notificationTokens addObject:token];
 
     // Observe NSUserDefaults for preference changes
-    for (NSString *keyPath in @[kShowEventDays, kMenuBarIconType, kShowMonthInIcon, kShowDayOfWeekInIcon, kShowDaysWithNoEventsInAgenda, kShowMeetingIndicator, kShowEventCountdown, kHideIcon, kBaselineOffset, kClockFormat]) {
+    for (NSString *keyPath in @[kShowEventDays, kMenuBarIconType, kShowMonthInIcon, kShowDayOfWeekInIcon, kShowDaysWithNoEventsInAgenda, kShowMeetingIndicator, kShowEventCountdown, kMenubarCountdownMaxWidthIconUnits, kHideIcon, kBaselineOffset, kClockFormat]) {
         [[NSUserDefaults standardUserDefaults] addObserver:self forKeyPath:keyPath options:NSKeyValueObservingOptionNew context:NULL];
     }
 }
@@ -1697,7 +1805,8 @@ static NSParagraphStyle *MoMenubarSingleLineParagraphStyle(void)
         [keyPath isEqualToString:kShowDaysWithNoEventsInAgenda]) {
         [self updateAgenda];
     }
-    else if ([keyPath isEqualToString:kShowEventCountdown]) {
+    else if ([keyPath isEqualToString:kShowEventCountdown] ||
+             [keyPath isEqualToString:kMenubarCountdownMaxWidthIconUnits]) {
         [self updateEventCountdownIfNecessary];
     }
     else if ([keyPath isEqualToString:kMenuBarIconType] ||
@@ -1706,6 +1815,7 @@ static NSParagraphStyle *MoMenubarSingleLineParagraphStyle(void)
              [keyPath isEqualToString:kShowMeetingIndicator] ||
              [keyPath isEqualToString:kHideIcon] ||
              [keyPath isEqualToString:kBaselineOffset]) {
+        [self updateEventCountdownIfNecessary];
         [self updateMenubarIcon];
     }
     else if ([keyPath isEqualToString:kClockFormat]) {

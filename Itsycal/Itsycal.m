@@ -33,3 +33,4 @@ NSString * const kShowDaysWithNoEventsInAgenda = @"ShowDaysWithNoEventsInAgenda"
 NSString * const kShowEventPopoverOnHover = @"ShowEventPopoverOnHover";
 NSString * const kEnableTahoeMenuIcons = @"EnableTahoeMenuIcons";
 NSString * const kShowEventCountdown = @"ShowEventCountdown";
+NSString * const kMenubarCountdownMaxWidthIconUnits = @"MenubarCountdownMaxWidthIconUnits";

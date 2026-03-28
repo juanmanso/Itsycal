@@ -43,7 +43,8 @@
         kHideIcon:             @(NO),
         kShowLocation:         @(NO),
         kEnableTahoeMenuIcons: @(NO),
-        kDoNotDrawOutlineAroundCurrentMonth: @(NO)
+        kDoNotDrawOutlineAroundCurrentMonth: @(NO),
+        kMenubarCountdownMaxWidthIconUnits: @(5)
     }];
     
     // Constrain kShowEventDays to values 0...9 in (unlikely) case it is invalid.
