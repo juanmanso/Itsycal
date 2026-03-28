@@ -131,6 +131,14 @@ static NSString *MoStringByTruncatingMiddleToWidth(NSString *string, CGFloat max
     return [[leftStr stringByAppendingString:ellipsis] stringByAppendingString:rightStr];
 }
 
+static NSDate *MoMenubarCountdownRelevantDateForEvent(EKEvent *event, NSDate *now)
+{
+    if ([now compare:event.startDate] == NSOrderedAscending) {
+        return event.startDate;
+    }
+    return event.endDate;
+}
+
 @implementation ViewController
 {
     EventCenter   *_ec;
@@ -1549,7 +1557,7 @@ static NSString *MoStringByTruncatingMiddleToWidth(NSString *string, CGFloat max
     if (tomorrowEvents) [candidates addObjectsFromArray:tomorrowEvents];
 
     // Find the nearest upcoming or in-progress non-all-day event within 8 hours.
-    NSDate *earliestStart = nil;
+    NSDate *bestRelevantDate = nil;
     EventInfo *nextEvent = nil;
     for (EventInfo *info in candidates) {
         if (info.isAllDay || !info.event) continue;
@@ -1558,8 +1566,9 @@ static NSString *MoStringByTruncatingMiddleToWidth(NSString *string, CGFloat max
         // Skip events starting more than 8 hours from now.
         if ([now compare:info.event.startDate] == NSOrderedAscending &&
             [info.event.startDate timeIntervalSinceDate:now] > 8 * 3600) continue;
-        if (earliestStart == nil || [info.event.startDate compare:earliestStart] == NSOrderedAscending) {
-            earliestStart = info.event.startDate;
+        NSDate *relevantDate = MoMenubarCountdownRelevantDateForEvent(info.event, now);
+        if (bestRelevantDate == nil || [relevantDate compare:bestRelevantDate] == NSOrderedAscending) {
+            bestRelevantDate = relevantDate;
             nextEvent = info;
         }
     }
