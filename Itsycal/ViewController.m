@@ -798,7 +798,14 @@
             dummyButton.image = _statusItem.button.image;
             dummyButton.imagePosition = _clockFormat ? NSImageLeft : NSImageOnly;
         }
-        dummyButton.title = _statusItem.button.title;
+        // Match the live button: clock and countdown use attributedTitle, not plain title.
+        NSAttributedString *measureTitle = _statusItem.button.attributedTitle;
+        if (measureTitle.length > 0) {
+            dummyButton.attributedTitle = [measureTitle copy];
+        } else {
+            dummyButton.attributedTitle = nil;
+            dummyButton.title = _statusItem.button.title ?: @"";
+        }
         [dummyButton sizeToFit];
         _statusItem.length = NSWidth(dummyButton.frame) + 2;
         if (@available(macOS 11, *)) {
@@ -1370,6 +1377,7 @@
         }
     }
 
+    // TODO(post-review): Optional truncation/ellipsis for very long event titles in the menubar countdown.
     if (nextEvent) {
         NSTimeInterval delta;
         NSString *prefix;
