@@ -661,15 +661,20 @@
 
 - (NSAttributedString *)countdownAttributedStringWithBaselineOffset:(CGFloat)baselineOffset prefix:(NSString *)prefix
 {
-    // Draw a thick rounded bar as an image.
-    CGFloat barWidth = 3.5;
-    CGFloat barHeight = 13.0;
-    NSImage *barImage = [NSImage imageWithSize:NSMakeSize(barWidth, barHeight) flipped:NO drawingHandler:^BOOL(NSRect rect) {
-        [[NSColor labelColor] setFill];
-        [[NSBezierPath bezierPathWithRoundedRect:rect xRadius:barWidth / 2.0 yRadius:barWidth / 2.0] fill];
-        return YES;
-    }];
-    barImage.template = YES;
+    static NSImage *barImage;
+    static CGFloat barWidth;
+    static CGFloat barHeight;
+    static dispatch_once_t barImageOnce;
+    dispatch_once(&barImageOnce, ^{
+        barWidth = 3.5;
+        barHeight = 13.0;
+        barImage = [NSImage imageWithSize:NSMakeSize(barWidth, barHeight) flipped:NO drawingHandler:^BOOL(NSRect rect) {
+            [[NSColor labelColor] setFill];
+            [[NSBezierPath bezierPathWithRoundedRect:rect xRadius:barWidth / 2.0 yRadius:barWidth / 2.0] fill];
+            return YES;
+        }];
+        barImage.template = YES;
+    });
 
     NSTextAttachment *attachment = [NSTextAttachment new];
     attachment.image = barImage;
