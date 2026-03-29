@@ -114,6 +114,14 @@ Por favor, cerrar Itsycal, trasladar a la carpeta Aplicaciones, y volver a arran
 "Show days with no events" = "Mostrar días sin eventos";
 "Show event dots" = "Mostrar puntos para eventos";
 "Show event location" = "Mostrar ubicación del evento";
+"Show event countdown" = "Mostrar cuenta atrás del evento";
+"Countdown menubar width (× status bar height)" = "Ancho del contador (× altura de la barra de menú)";
+"Truncate long titles in the middle" = "Truncar títulos largos por el medio";
+"%1$@ – %2$@" = "%1$@ – %2$@";
+"%1$@ – now" = "%1$@ – ahora";
+"%1$@ in %2$@" = "%1$@ en %2$@";
+"%1$ldh %2$ldm" = "%1$ld h %2$ld min";
+"%1$ldm" = "%1$ld min";
 "Show month in icon" = "El icono muestra mes";
 "Starts:" = "Empieza:";
 "Sunday" = "Domingo";

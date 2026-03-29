@@ -161,11 +161,24 @@ static NSString *kSelectedCalendars = @"SelectedCalendars";
     //os_log(OS_LOG_DEFAULT, "%s", __FUNCTION__);
     MoDate startMoDate = [self.delegate fetchStartDate];
     MoDate endMoDate   = [self.delegate fetchEndDate];
+    [self fetchEventsWithStartDate:startMoDate endDate:endMoDate];
+}
+
+- (void)fetchEventsWithStartDate:(MoDate)startMoDate endDate:(MoDate)endMoDate {
     dispatch_async(_queueWork, ^{
         @autoreleasepool {
             [self _fetchEventsWithStartDate:startMoDate endDate:endMoDate refetch:NO];
         }
     });
+}
+
+- (BOOL)hasFetchedEventsWithStartDate:(MoDate)startMoDate endDate:(MoDate)endMoDate {
+    __block BOOL hasFetched = NO;
+    dispatch_sync(_queueWork, ^{
+        NSRange dateRange = NSMakeRange(startMoDate.julian, endMoDate.julian - startMoDate.julian);
+        hasFetched = [self->_previouslyFetchedDates containsIndexesInRange:dateRange];
+    });
+    return hasFetched;
 }
 
 - (void)refetchAll {

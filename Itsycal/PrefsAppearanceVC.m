@@ -66,6 +66,31 @@
     NSButton *showDaysWithoutEvents = chkbx(NSLocalizedString(@"Show days with no events", @""));
     _hideIcon = chkbx(NSLocalizedString(@"Hide icon", @""));
 
+    NSTextField *countdownWidthLabel = [NSTextField labelWithString:NSLocalizedString(@"Countdown menubar width (× status bar height)", @"Slider label; width is relative to menu bar thickness")];
+    countdownWidthLabel.font = [NSFont systemFontOfSize:countdownWidthLabel.font.pointSize - 1];
+    NSTextField *countdownWidthMinLabel = [NSTextField labelWithString:@"1"];
+    NSTextField *countdownWidthMaxLabel = [NSTextField labelWithString:@"20"];
+    countdownWidthMinLabel.font = countdownWidthMaxLabel.font = [NSFont systemFontOfSize:countdownWidthMinLabel.font.pointSize - 1];
+    NSSlider *countdownWidthSlider = [NSSlider sliderWithValue:5 minValue:1 maxValue:20 target:nil action:NULL];
+    countdownWidthSlider.sliderType = NSSliderTypeLinear;
+    NSButton *countdownTruncateMiddle = chkbx(NSLocalizedString(@"Truncate long titles in the middle", @"Prefer middle ellipsis instead of end"));
+    NSStackView *countdownSliderRow = [[NSStackView alloc] initWithViews:@[countdownWidthMinLabel, countdownWidthSlider, countdownWidthMaxLabel]];
+    countdownSliderRow.orientation = NSUserInterfaceLayoutOrientationHorizontal;
+    countdownSliderRow.spacing = 8;
+    countdownSliderRow.alignment = NSLayoutAttributeCenterY;
+    [countdownWidthSlider.widthAnchor constraintGreaterThanOrEqualToConstant:120].active = YES;
+    NSStackView *countdownDetailStack = [[NSStackView alloc] initWithViews:@[countdownWidthLabel, countdownSliderRow, countdownTruncateMiddle]];
+    countdownDetailStack.orientation = NSUserInterfaceLayoutOrientationVertical;
+    countdownDetailStack.alignment = NSLayoutAttributeLeading;
+    countdownDetailStack.spacing = 4;
+    NSButton *showCountdown = [NSButton checkboxWithTitle:NSLocalizedString(@"Show event countdown", @"") target:nil action:nil];
+    NSStackView *countdownSection = [[NSStackView alloc] initWithViews:@[showCountdown, countdownDetailStack]];
+    countdownSection.orientation = NSUserInterfaceLayoutOrientationVertical;
+    countdownSection.alignment = NSLayoutAttributeLeading;
+    countdownSection.spacing = 6;
+    countdownSection.detachesHiddenViews = YES;
+    [v addSubview:countdownSection];
+
     // Datetime format text field
     _dateTimeFormat = [NSTextField textFieldWithString:@""];
     _dateTimeFormat.placeholderString = NSLocalizedString(@"Datetime pattern", @"");
@@ -119,8 +144,8 @@
     sizeSlider.maxValue = SizePreferenceLarge;  // = 2
     [v addSubview:sizeSlider];
 
-    MoVFLHelper *vfl = [[MoVFLHelper alloc] initWithSuperview:v metrics:@{@"m": @20, @"mm": @40} views:NSDictionaryOfVariableBindings(iconPicker, menubarLabel, calendarLabel, separator0, separator1, showMonth, showDayOfWeek, showEventDots, useColoredDots, showWeeks, showLocation, showDaysWithoutEvents, _dateTimeFormat, helpButton, _hideIcon, highlight, themeLabel, themePopup, sizeMinLabel, sizeSlider, sizeMaxLabel)];
-    [vfl :@"V:|-m-[menubarLabel]-10-[iconPicker]-[showMonth]-[showDayOfWeek]-[_dateTimeFormat]-[_hideIcon]-m-[calendarLabel]-10-[sizeSlider]-15-[themePopup]-m-[highlight]-m-[showEventDots]-[useColoredDots]-[showLocation]-[showDaysWithoutEvents]-[showWeeks]-m-|"];
+    MoVFLHelper *vfl = [[MoVFLHelper alloc] initWithSuperview:v metrics:@{@"m": @20, @"mm": @40} views:NSDictionaryOfVariableBindings(iconPicker, menubarLabel, calendarLabel, separator0, separator1, showMonth, showDayOfWeek, showEventDots, useColoredDots, showWeeks, showLocation, showDaysWithoutEvents, _dateTimeFormat, helpButton, _hideIcon, countdownSection, highlight, themeLabel, themePopup, sizeMinLabel, sizeSlider, sizeMaxLabel)];
+    [vfl :@"V:|-m-[menubarLabel]-10-[iconPicker]-[showMonth]-[showDayOfWeek]-[_dateTimeFormat]-[_hideIcon]-[countdownSection]-m-[calendarLabel]-10-[sizeSlider]-15-[themePopup]-m-[highlight]-m-[showEventDots]-[useColoredDots]-[showLocation]-[showDaysWithoutEvents]-[showWeeks]-m-|"];
     [vfl :@"H:|-m-[menubarLabel]-[separator0]-m-|" :NSLayoutFormatAlignAllCenterY];
     [vfl :@"H:|-m-[calendarLabel]-[separator1]-m-|" :NSLayoutFormatAlignAllCenterY];
     [vfl :@"H:|-m-[iconPicker]-m-|"];
@@ -128,6 +153,7 @@
     [vfl :@"H:|-m-[showDayOfWeek]-(>=m)-|"];
     [vfl :@"H:|-m-[_dateTimeFormat]-[helpButton]-m-|" :NSLayoutFormatAlignAllCenterY];
     [vfl :@"H:|-m-[_hideIcon]-(>=m)-|"];
+    [vfl :@"H:|-m-[countdownSection]-(>=m)-|"];
     [vfl :@"H:|-m-[highlight]-(>=m)-|"];
     [vfl :@"H:|-(>=m)-[sizeMinLabel]-[sizeSlider(90)]-[sizeMaxLabel]-(>=m)-|" :NSLayoutFormatAlignAllCenterY];
     [vfl :@"H:|-m-[themeLabel]-[themePopup]-(>=m)-|" :NSLayoutFormatAlignAllFirstBaseline];
@@ -144,6 +170,14 @@
     [showMonth bind:@"value" toObject:[NSUserDefaultsController sharedUserDefaultsController] withKeyPath:[@"values." stringByAppendingString:kShowMonthInIcon] options:@{NSContinuouslyUpdatesValueBindingOption: @(YES)}];
     [showDayOfWeek bind:@"value" toObject:[NSUserDefaultsController sharedUserDefaultsController] withKeyPath:[@"values." stringByAppendingString:kShowDayOfWeekInIcon] options:@{NSContinuouslyUpdatesValueBindingOption: @(YES)}];
     [_hideIcon bind:@"value" toObject:[NSUserDefaultsController sharedUserDefaultsController] withKeyPath:[@"values." stringByAppendingString:kHideIcon] options:@{NSContinuouslyUpdatesValueBindingOption: @(YES)}];
+    [showCountdown bind:@"value" toObject:[NSUserDefaultsController sharedUserDefaultsController] withKeyPath:[@"values." stringByAppendingString:kShowEventCountdown] options:@{NSContinuouslyUpdatesValueBindingOption: @(YES)}];
+
+    NSUserDefaultsController *sudc = [NSUserDefaultsController sharedUserDefaultsController];
+    NSString *countdownOnPath = [@"values." stringByAppendingString:kShowEventCountdown];
+    NSDictionary *hideWhenCountdownOff = @{NSContinuouslyUpdatesValueBindingOption: @(YES), NSValueTransformerNameBindingOption: NSNegateBooleanTransformerName};
+    [countdownDetailStack bind:@"hidden" toObject:sudc withKeyPath:countdownOnPath options:hideWhenCountdownOff];
+    [countdownWidthSlider bind:@"value" toObject:sudc withKeyPath:[@"values." stringByAppendingString:kMenubarCountdownMaxWidthIconUnits] options:@{NSContinuouslyUpdatesValueBindingOption: @(YES)}];
+    [countdownTruncateMiddle bind:@"value" toObject:sudc withKeyPath:[@"values." stringByAppendingString:kMenubarCountdownTruncateTitleMiddle] options:@{NSContinuouslyUpdatesValueBindingOption: @(YES)}];
 
     // Bind icon prefs enabled state to kHideIcon's value
     [iconPicker bind:@"enabled" toObject:[NSUserDefaultsController sharedUserDefaultsController] withKeyPath:[@"values." stringByAppendingString:kHideIcon] options:@{NSContinuouslyUpdatesValueBindingOption: @(YES), NSValueTransformerNameBindingOption: NSNegateBooleanTransformerName}];
