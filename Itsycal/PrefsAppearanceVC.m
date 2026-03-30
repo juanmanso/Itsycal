@@ -54,6 +54,7 @@
         [NSImage imageNamed:@"menubaricon3"]
     ] trackingMode:NSSegmentSwitchTrackingSelectOne target:nil action:nil];
     [iconPicker setSelectedSegment:0]; // will be set by binding below.
+    [iconPicker setContentCompressionResistancePriority:NSLayoutPriorityRequired forOrientation:NSLayoutConstraintOrientationHorizontal];
     [v addSubview:iconPicker];
 
     // Checkboxes
@@ -68,6 +69,8 @@
 
     NSTextField *countdownWidthLabel = [NSTextField labelWithString:NSLocalizedString(@"Countdown menubar width (× status bar height)", @"Slider label; width is relative to menu bar thickness")];
     countdownWidthLabel.font = [NSFont systemFontOfSize:countdownWidthLabel.font.pointSize - 1];
+    countdownWidthLabel.preferredMaxLayoutWidth = 520;
+    countdownWidthLabel.usesSingleLineMode = NO;
     NSTextField *countdownWidthMinLabel = [NSTextField labelWithString:@"1"];
     NSTextField *countdownWidthMaxLabel = [NSTextField labelWithString:@"20"];
     countdownWidthMinLabel.font = countdownWidthMaxLabel.font = [NSFont systemFontOfSize:countdownWidthMinLabel.font.pointSize - 1];
@@ -78,6 +81,8 @@
     countdownSliderRow.orientation = NSUserInterfaceLayoutOrientationHorizontal;
     countdownSliderRow.spacing = 8;
     countdownSliderRow.alignment = NSLayoutAttributeCenterY;
+    countdownSliderRow.distribution = NSStackViewDistributionFill;
+    [countdownWidthSlider setContentHuggingPriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
     [countdownWidthSlider.widthAnchor constraintGreaterThanOrEqualToConstant:120].active = YES;
     NSStackView *countdownDetailStack = [NSStackView stackViewWithViews:@[countdownWidthLabel, countdownSliderRow, countdownTruncateMiddle]];
     countdownDetailStack.orientation = NSUserInterfaceLayoutOrientationVertical;
@@ -88,7 +93,7 @@
     countdownSection.orientation = NSUserInterfaceLayoutOrientationVertical;
     countdownSection.alignment = NSLayoutAttributeLeading;
     countdownSection.spacing = 6;
-    countdownSection.detachesHiddenViews = YES;
+    countdownSection.detachesHiddenViews = NO;
     [v addSubview:countdownSection];
 
     // Datetime format text field
@@ -153,8 +158,8 @@
     [vfl :@"H:|-m-[showDayOfWeek]-(>=m)-|"];
     [vfl :@"H:|-m-[_dateTimeFormat]-[helpButton]-m-|" :NSLayoutFormatAlignAllCenterY];
     [vfl :@"H:|-m-[_hideIcon]-(>=m)-|"];
-    [vfl :@"H:|-m-[countdownSection]-(>=m)-|"];
-    [vfl :@"H:|-m-[highlight]-(>=m)-|"];
+    [vfl :@"H:|-m-[countdownSection]-m-|"];
+    [vfl :@"H:|-m-[highlight]-m-|"];
     [vfl :@"H:|-(>=m)-[sizeMinLabel]-[sizeSlider(90)]-[sizeMaxLabel]-(>=m)-|" :NSLayoutFormatAlignAllCenterY];
     [vfl :@"H:|-m-[themeLabel]-[themePopup]-(>=m)-|" :NSLayoutFormatAlignAllFirstBaseline];
     [vfl :@"H:|-m-[showEventDots]-(>=m)-|"];

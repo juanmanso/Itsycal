@@ -27,6 +27,15 @@ Sizer *SizePref = nil;
     return shared;
 }
 
+- (void)setNilValueForKey:(NSString *)key
+{
+    if ([key isEqualToString:@"sizePreference"]) {
+        self.sizePreference = SizePreferenceMedium;
+    } else {
+        [super setNilValueForKey:key];
+    }
+}
+
 - (void)setSizePreference:(SizePreference)sizePreference {
     _sizePreference = sizePreference;
     // Post notification on the main thread because the selector,
