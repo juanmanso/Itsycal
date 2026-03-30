@@ -5,11 +5,15 @@
 
 #import "PrefsVC.h"
 
+static const CGFloat kPrefsMeasureWidth = 480;
+static const CGFloat kPrefsMaxVisibleHeight = 560;
+
 @implementation PrefsVC
 {
     NSToolbar *_toolbar;
     NSMutableArray<NSString *> *_toolbarIdentifiers;
     NSInteger _selectedItemTag;
+    NSScrollView *_scrollView;
 }
 
 - (instancetype)init
@@ -27,7 +31,83 @@
 
 - (void)loadView
 {
-    self.view = [NSView new];
+    NSView *v = [NSView new];
+    v.translatesAutoresizingMaskIntoConstraints = NO;
+    self.view = v;
+
+    _scrollView = [[NSScrollView alloc] initWithFrame:NSZeroRect];
+    _scrollView.translatesAutoresizingMaskIntoConstraints = NO;
+    _scrollView.hasVerticalScroller = YES;
+    _scrollView.autohidesScrollers = YES;
+    _scrollView.drawsBackground = NO;
+    _scrollView.borderType = NSNoBorder;
+    [v addSubview:_scrollView];
+    [NSLayoutConstraint activateConstraints:@[
+        [_scrollView.leadingAnchor constraintEqualToAnchor:v.leadingAnchor],
+        [_scrollView.trailingAnchor constraintEqualToAnchor:v.trailingAnchor],
+        [_scrollView.topAnchor constraintEqualToAnchor:v.topAnchor],
+        [_scrollView.bottomAnchor constraintEqualToAnchor:v.bottomAnchor],
+    ]];
+}
+
+/// Sizes the document view from the clip view width and the tab content’s Auto Layout height.
+/// Avoids pinning the document to NSClipView with layout anchors — on recent macOS that can raise
+/// “Location anchors require being paired” when the document is the scroll view’s documentView.
+- (void)mo_updateDocumentViewLayout
+{
+    NSView *doc = _scrollView.documentView;
+    if (!doc) return;
+
+    doc.translatesAutoresizingMaskIntoConstraints = NO;
+    // Use the scroll view width so the document matches the visible content area. Relying only on
+    // NSClipView bounds can lag (e.g. when the scroller shows/hides), leaving a blank strip on the right.
+    CGFloat w = NSWidth(_scrollView.bounds);
+    if (w < 1) {
+        w = MAX(kPrefsMeasureWidth, NSWidth(self.view.bounds));
+    }
+
+    [doc setFrame:NSMakeRect(0, 0, w, 10000)];
+    [doc layoutSubtreeIfNeeded];
+
+    NSSize fit = [doc fittingSize];
+    CGFloat h = MAX(fit.height, 120);
+    [doc setFrame:NSMakeRect(0, 0, w, h)];
+}
+
+- (void)mo_setDocumentView:(NSView *)doc
+{
+    doc.translatesAutoresizingMaskIntoConstraints = NO;
+    _scrollView.documentView = doc;
+    [self mo_updateDocumentViewLayout];
+}
+
+- (void)viewDidLayout
+{
+    [super viewDidLayout];
+    [self mo_updateDocumentViewLayout];
+}
+
+/// Sizes the prefs content area: full document width/height from Auto Layout, but caps visible height so tall tabs scroll instead of clipping.
+- (NSSize)mo_prefsContentAreaSize
+{
+    NSView *doc = _scrollView.documentView;
+    if (!doc) {
+        return NSMakeSize(kPrefsMeasureWidth, 300);
+    }
+
+    CGFloat measureWidth = kPrefsMeasureWidth;
+    if (self.view.window) {
+        measureWidth = MAX(kPrefsMeasureWidth, NSWidth(self.view.window.contentView.bounds));
+    }
+
+    [self.view setFrame:NSMakeRect(0, 0, measureWidth, kPrefsMaxVisibleHeight)];
+    [self.view layoutSubtreeIfNeeded];
+    [self mo_updateDocumentViewLayout];
+    [doc layoutSubtreeIfNeeded];
+
+    NSSize docSize = doc.bounds.size;
+    CGFloat visibleHeight = MIN(MAX(docSize.height, 120), kPrefsMaxVisibleHeight);
+    return NSMakeSize(MAX(docSize.width, 380), visibleHeight);
 }
 
 - (void)viewDidAppear
@@ -69,9 +149,9 @@
     for (NSViewController *childViewController in childViewControllers) {
         [_toolbarIdentifiers addObject:childViewController.title];
     }
-    [self.view setFrame:(NSRect){0, 0, childViewControllers[0].view.fittingSize}];
-    [childViewControllers[0].view setFrame:self.view.bounds];
-    [self.view addSubview:childViewControllers[0].view];
+    [self mo_setDocumentView:childViewControllers[0].view];
+    NSSize area = [self mo_prefsContentAreaSize];
+    [self.view setFrame:(NSRect){0, 0, area}];
     [_toolbar setSelectedItemIdentifier:_toolbarIdentifiers[0]];
 }
 
@@ -87,30 +167,36 @@
     _selectedItemTag = item.tag;
 
     NSViewController *toVC = [self viewControllerForItemIdentifier:item.itemIdentifier];
-    if (toVC) {
+    if (!toVC) return;
 
-        if (self.view.subviews[0] == toVC.view) return;
+    if (_scrollView.documentView == toVC.view) return;
 
-        NSWindow *window = self.view.window;
-        NSRect contentRect = (NSRect){0, 0, toVC.view.fittingSize};
-        NSRect contentFrame = [window frameRectForContentRect:contentRect];
-        CGFloat windowHeightDelta = window.frame.size.height - contentFrame.size.height;
-        NSPoint newOrigin = NSMakePoint(window.frame.origin.x, window.frame.origin.y + windowHeightDelta);
-        NSRect newFrame = (NSRect){newOrigin, contentFrame.size};
-
-        [toVC.view setAlphaValue: 0];
-        [toVC.view setFrame:contentRect];
-        [self.view addSubview:toVC.view];
-
-        [NSAnimationContext runAnimationGroup:^(NSAnimationContext * _Nonnull context) {
-            [context setDuration:animated ? 0.2 : 0];
-            [window.animator setFrame:newFrame display:NO];
-            [toVC.view.animator setAlphaValue:1];
-            [self.view.subviews[0].animator setAlphaValue:0];
-        } completionHandler:^{
-            [self.view.subviews[0] removeFromSuperview];
-        }];
+    NSWindow *window = self.view.window;
+    if (!window) {
+        [self mo_setDocumentView:toVC.view];
+        NSSize area = [self mo_prefsContentAreaSize];
+        [self.view setFrame:(NSRect){0, 0, area}];
+        return;
     }
+
+    [toVC.view setAlphaValue:animated ? 0 : 1];
+    [self mo_setDocumentView:toVC.view];
+    NSSize area = [self mo_prefsContentAreaSize];
+    NSRect contentRect = (NSRect){0, 0, area};
+    NSRect contentFrame = [window frameRectForContentRect:contentRect];
+    CGFloat windowHeightDelta = window.frame.size.height - contentFrame.size.height;
+    NSPoint newOrigin = NSMakePoint(window.frame.origin.x, window.frame.origin.y + windowHeightDelta);
+    NSRect newFrame = (NSRect){newOrigin, contentFrame.size};
+
+    [self.view setFrame:contentRect];
+
+    [NSAnimationContext runAnimationGroup:^(NSAnimationContext * _Nonnull context) {
+        [context setDuration:animated ? 0.2 : 0];
+        [window.animator setFrame:newFrame display:YES];
+        if (animated) {
+            [toVC.view.animator setAlphaValue:1];
+        }
+    } completionHandler:^{}];
 }
 
 - (NSViewController *)viewControllerForItemIdentifier:(NSString *)itemIdentifier

@@ -576,6 +576,7 @@ static NSString *MoMenubarCountdownString(NSString *title, NSString *timeStr, BO
         _prefsWC = [[NSWindowController alloc] initWithWindow:panel];
         _prefsWC.contentViewController = prefsVC;
         _prefsWC.window.contentView.wantsLayer = YES;
+        panel.contentMinSize = NSMakeSize(380, 200);
         [_prefsWC.window center];
     }
     return _prefsWC;

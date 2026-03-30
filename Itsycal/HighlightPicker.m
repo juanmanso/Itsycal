@@ -50,6 +50,12 @@
     return self;
 }
 
+- (void)layout
+{
+    [super layout];
+    _grid.frame = self.bounds;
+}
+
 - (void)setWeekStartDOW:(NSInteger)weekStartDOW
 {
     // Constrain weekStartDOW to 0...6.
